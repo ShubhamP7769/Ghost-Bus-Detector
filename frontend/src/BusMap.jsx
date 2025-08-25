@@ -3,7 +3,6 @@ import { MapContainer, TileLayer, CircleMarker, Tooltip } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import axios from "axios";
 
-// Bus Information Panel
 const BusInfoPanel = ({ bus, onClose }) => {
   if (!bus) return null;
   return (

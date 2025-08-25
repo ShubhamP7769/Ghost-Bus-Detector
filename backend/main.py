@@ -7,8 +7,6 @@ from typing import Dict, Any
 import sys
 
 app = FastAPI()
-
-# Allow frontend access
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -16,17 +14,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- MTA API Configuration ---
-# These are the new, correct, public URLs for the bus data feeds.
+#MTA API Configuration
 MTA_FEEDS = [
     "https://gtfsrt.prod.obanyc.com/vehiclePositions?feed_id=b",  # Bronx
     "https://gtfsrt.prod.obanyc.com/vehiclePositions?feed_id=bqc" # Brooklyn, Queens, Staten Island
 ]
 
-# In-memory storage for bus data
+#In-memory storage for bus data
 bus_data: Dict[str, Dict[str, Any]] = {}
 
-# --- Helper Function to Fetch and Parse Data ---
+#Helper Function to Fetch and Parse Data
 def fetch_mta_data():
     headers = {
         'User-Agent': 'GhostBusDetector/1.0 (https://github.com/ShubhamP7769/Ghost-Bus-Detector)'
@@ -64,7 +61,7 @@ def fetch_mta_data():
             print(f"Failed to parse data from {url}. Error: {e}", file=sys.stderr)
             print(f"Response content preview: {response.content[:500]}", file=sys.stderr)
 
-# --- API Endpoint ---
+#API Endpoint
 @app.get("/buses")
 def get_buses():
     fetch_mta_data()
