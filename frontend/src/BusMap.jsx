@@ -50,7 +50,7 @@ export default function BusMap() {
         .catch(err => console.error(err));
     };
     fetchBuses();
-    const interval = setInterval(fetchBuses, 15000); // refresh every 15s
+    const interval = setInterval(fetchBuses, 5000); // refresh every 5s
     return () => clearInterval(interval);
   }, []);
 
@@ -62,20 +62,25 @@ export default function BusMap() {
           attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> &copy; CARTO'
         />
 
-        {buses.map(bus => (
-          <CircleMarker
-            key={bus.id}
-            center={[bus.lat, bus.lon]}
-            radius={6}
-            color={bus.status === "Ghost" ? "red" : "green"}
-            fillOpacity={0.8}
-            eventHandlers={{
-              click: () => setSelectedBus(bus),
-            }}
-          >
-            <Tooltip>Bus ID: {bus.id}</Tooltip>
-          </CircleMarker>
-        ))}
+        {buses.map(bus => {
+          const status = (bus.status || "").toLowerCase();
+          const isGhost = status === "ghost";
+
+          return (
+            <CircleMarker
+              key={bus.id}
+              center={[bus.lat, bus.lon]}
+              radius={isGhost ? 8 : 6}  // ghost = slightly bigger
+              color={isGhost ? "red" : "green"}
+              fillOpacity={0.9}
+              eventHandlers={{
+                click: () => setSelectedBus(bus),
+              }}
+            >
+              <Tooltip>Bus ID: {bus.id} ({status})</Tooltip>
+            </CircleMarker>
+          );
+        })}
       </MapContainer>
 
       <BusInfoPanel bus={selectedBus} onClose={() => setSelectedBus(null)} />

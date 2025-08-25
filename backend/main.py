@@ -14,16 +14,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-#MTA API Configuration
+# MTA API Configuration
 MTA_FEEDS = [
-    "https://gtfsrt.prod.obanyc.com/vehiclePositions?feed_id=b",  # Bronx
-    "https://gtfsrt.prod.obanyc.com/vehiclePositions?feed_id=bqc" # Brooklyn, Queens, Staten Island
+    "https://gtfsrt.prod.obanyc.com/vehiclePositions?feed_id=b",   # Bronx
+    "https://gtfsrt.prod.obanyc.com/vehiclePositions?feed_id=bqc"  # Brooklyn, Queens, Staten Island
 ]
 
-#In-memory storage for bus data
+# In-memory storage for bus data
 bus_data: Dict[str, Dict[str, Any]] = {}
 
-#Helper Function to Fetch and Parse Data
+# Helper Function to Fetch and Parse Data
 def fetch_mta_data():
     headers = {
         'User-Agent': 'GhostBusDetector/1.0 (https://github.com/ShubhamP7769/Ghost-Bus-Detector)'
@@ -61,7 +61,7 @@ def fetch_mta_data():
             print(f"Failed to parse data from {url}. Error: {e}", file=sys.stderr)
             print(f"Response content preview: {response.content[:500]}", file=sys.stderr)
 
-#API Endpoint
+# API Endpoint
 @app.get("/buses")
 def get_buses():
     fetch_mta_data()
@@ -73,8 +73,8 @@ def get_buses():
     ghost_count = 0
     
     for bus_id, data in list(bus_data.items()):
-        # A bus is a "ghost" if its data hasn't been updated in over 3 minutes
-        if current_time - data["timestamp"] > 180:
+        # A bus is a "ghost" if its data hasn't been updated in over 1 minute (60s)
+        if current_time - data["timestamp"] > 60:
             data["status"] = "Ghost"
             ghost_count += 1
         else:
