@@ -1,114 +1,103 @@
 import L from 'leaflet';
 import React, { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Tooltip } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import axios from "axios";
 
-// Text marker
+// Simplified text marker
 const TextMarker = ({ text }) => {
   return L.divIcon({
-    className: "",
+    className: "custom-icon",
     html: `<div style="font-size: 20px;">${text}</div>`
   });
 };
 
-// Overlay showing bus counts
-const BusOverlay = ({ running, ghost }) => {
-  const map = useMap();
-  useEffect(() => {
-    const div = L.DomUtil.create("div", "bus-overlay");
-    div.style.position = "absolute";
-    div.style.bottom = "10px";
-    div.style.left = "10px";
-    div.style.background = "transparent";
-    div.style.fontSize = "16px";
-    div.style.fontWeight = "bold";
-    div.innerHTML = `🟢 Running: ${running} 🔴 Ghost: ${ghost}`;
-    map.getContainer().appendChild(div);
-
-    return () => div.remove();
-  }, [running, ghost, map]);
-  return null;
+// Bus Information Panel
+const BusInfoPanel = ({ bus, onClose }) => {
+    if (!bus) return null;
+    return (
+        <div style={{
+            position: 'absolute',
+            top: '10px',
+            right: '10px',
+            width: '250px',
+            background: 'white',
+            padding: '10px',
+            borderRadius: '5px',
+            zIndex: 1000,
+            boxShadow: '0 1px 5px rgba(0,0,0,0.4)'
+        }}>
+            <button onClick={onClose} style={{ float: 'right', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '16px' }}>✖</button>
+            <h3>Bus Details</h3>
+            <p><b>Bus ID:</b> {bus.id}</p>
+            <p><b>Route:</b> {bus.route}</p>
+            <p><b>Status:</b> {bus.status}</p>
+            <p><b>Speed:</b> {bus.speed ? bus.speed.toFixed(1) : 'N/A'} mph</p>
+        </div>
+    );
 };
 
 export default function BusMap() {
-  const [buses, setBuses] = useState([]);
-  const [counts, setCounts] = useState({ running_count: 0, ghost_count: 0 });
-  const [positions, setPositions] = useState({});
+    const [buses, setBuses] = useState([]);
+    const [counts, setCounts] = useState({ running_count: 0, ghost_count: 0 });
+    const [selectedBus, setSelectedBus] = useState(null);
 
-  // Fetch buses every 2 seconds
-  useEffect(() => {
-    const fetchBuses = () => {
-      axios.get("http://127.0.0.1:8000/buses")
-        .then(res => {
-          setBuses(res.data.buses);
-          setCounts({
-            running_count: res.data.running_count,
-            ghost_count: res.data.ghost_count
-          });
+    useEffect(() => {
+        const fetchBuses = () => {
+            axios.get("http://127.0.0.1:8000/buses")
+                .then(res => {
+                    setBuses(res.data.buses);
+                    setCounts({
+                        running_count: res.data.running_count,
+                        ghost_count: res.data.ghost_count
+                    });
+                })
+                .catch(err => console.error(err));
+        };
+        fetchBuses();
+        const interval = setInterval(fetchBuses, 15000); // Fetch data every 15 seconds
+        return () => clearInterval(interval);
+    }, []);
 
-          setPositions(prev => {
-            const updated = { ...prev };
-            res.data.buses.forEach(bus => {
-              if (!updated[bus.id]) {
-                updated[bus.id] = { currentLat: bus.lat, currentLon: bus.lon, targetLat: bus.lat, targetLon: bus.lon };
-              } else {
-                updated[bus.id].targetLat = bus.lat;
-                updated[bus.id].targetLon = bus.lon;
-              }
-            });
-            return updated;
-          });
-        })
-        .catch(err => console.error(err));
-    };
-    fetchBuses();
-    const interval = setInterval(fetchBuses, 2000);
-    return () => clearInterval(interval);
-  }, []);
+    return (
+        <div style={{ position: "relative", height: "100vh" }}>
+            <MapContainer center={[40.7128, -74.0060]} zoom={12} style={{ height: "100%", width: "100%" }}>
+                <TileLayer
+                    url="https://cartodb-basemaps-a.global.ssl.fastly.net/light_all/{z}/{x}/{y}{r}.png"
+                    attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> &copy; CARTO'
+                />
 
-  // Smooth movement
-  useEffect(() => {
-    const anim = setInterval(() => {
-      setPositions(prev => {
-        const updated = { ...prev };
-        Object.keys(updated).forEach(id => {
-          const bus = updated[id];
-          bus.currentLat += (bus.targetLat - bus.currentLat) * 0.1;
-          bus.currentLon += (bus.targetLon - bus.currentLon) * 0.1;
-        });
-        return updated;
-      });
-    }, 50);
-    return () => clearInterval(anim);
-  }, []);
+                {buses.map(bus => (
+                    <Marker
+                        key={bus.id}
+                        position={[bus.lat, bus.lon]}
+                        icon={TextMarker({ text: bus.status === "Ghost" ? "🔴" : "🟢" })}
+                        eventHandlers={{
+                            click: () => {
+                                setSelectedBus(bus);
+                            },
+                        }}
+                    >
+                        <Tooltip>Bus ID: {bus.id}</Tooltip>
+                    </Marker>
+                ))}
+            </MapContainer>
+            
+            <BusInfoPanel bus={selectedBus} onClose={() => setSelectedBus(null)} />
 
-  return (
-    <MapContainer center={[19.0760, 72.8777]} zoom={12} style={{ height: "100vh", width: "100%" }}>
-      <TileLayer
-        url="https://cartodb-basemaps-a.global.ssl.fastly.net/light_all/{z}/{x}/{y}{r}.png"
-        attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> &copy; CARTO'
-      />
-
-      {buses.map(bus => {
-        const pos = positions[bus.id] || { currentLat: bus.lat, currentLon: bus.lon };
-        return (
-          <Marker
-            key={bus.id}
-            position={[pos.currentLat, pos.currentLon]}
-            icon={TextMarker({ text: bus.status === "Ghost" ? "🔴" : "🟢" })}
-          >
-            <Popup>
-              <b>Bus Number:</b> {bus.id} <br/>
-              <b>Route:</b> {bus.route} <br/>
-              <b>Status:</b> {bus.status} <br/>
-              <b>Speed:</b> {bus.speed.toFixed(1)} km/h
-            </Popup>
-          </Marker>
-        );
-      })}
-
-      <BusOverlay running={counts.running_count} ghost={counts.ghost_count} />
-    </MapContainer>
-  );
+            <div style={{
+                position: "absolute",
+                bottom: "20px",
+                left: "10px",
+                zIndex: 1000,
+                background: "white",
+                padding: "5px 10px",
+                borderRadius: "5px",
+                border: "1px solid #ccc",
+                boxShadow: "0 1px 5px rgba(0,0,0,0.4)"
+            }}>
+                🟢 Running: {counts.running_count} 🔴 Ghost: {counts.ghost_count}
+            </div>
+        </div>
+    );
 }
