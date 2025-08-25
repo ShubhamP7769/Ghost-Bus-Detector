@@ -1,6 +1,6 @@
 Ghost Bus Detector
 
-Ghost Bus Detector** is a real-time transit monitoring system that tracks buses using GTFS-Realtime feeds, detects ‘ghost’ buses (inactive or stale), and visualizes them on an interactive map using React and Leaflet, supported by a Python FastAPI backend.
+Ghost Bus Detector is a real-time transit monitoring system that tracks buses using GTFS-Realtime feeds, detects ‘ghost’ buses (inactive or stale), and visualizes them on an interactive map using React and Leaflet, supported by a Python FastAPI backend.
 
 
 Features:
