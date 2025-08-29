@@ -1,59 +1,52 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { MapContainer, TileLayer, CircleMarker, Tooltip } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip as ChartTooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 
 export default function BusMap() {
   const [buses, setBuses] = useState([]);
-  const [filter, setFilter] = useState("All");
-  const prevPositions = useRef({}); // store previous positions
-  const targetPositions = useRef({}); // target positions from last fetch
+  const [showChart, setShowChart] = useState(false);
+  const [chartData, setChartData] = useState([]);
 
-  // Fetch buses every 2 minutes
+  // Fetch bus data every 2 minutes
   const fetchBuses = async () => {
     try {
       const response = await fetch("http://127.0.0.1:8000/buses");
       const data = await response.json();
+      const busList = data.buses || [];
+      setBuses(busList);
 
-      data.buses.forEach((bus) => {
-        targetPositions.current[bus.id] = { lat: bus.lat, lon: bus.lon };
-        if (!prevPositions.current[bus.id]) {
-          prevPositions.current[bus.id] = { lat: bus.lat, lon: bus.lon };
-        }
-      });
+      // Prepare chart data: counts by status over time
+      const runningCount = busList.filter((b) => b.status === "Running").length;
+      const ghostCount = busList.filter((b) => b.status === "Ghost").length;
+      const anomalyCount = busList.filter((b) => b.status === "Anomaly").length;
 
-      setBuses(data.buses); // update statuses and speeds immediately
+      setChartData((prev) => [
+        ...prev,
+        {
+          time: new Date().toLocaleTimeString(),
+          Running: runningCount,
+          Ghost: ghostCount,
+          Anomaly: anomalyCount,
+        },
+      ]);
     } catch (err) {
-      console.error("Failed to fetch bus data:", err);
+      console.error("Failed to fetch buses:", err);
     }
   };
 
-  // Animate buses every second
   useEffect(() => {
-    const interval = setInterval(() => {
-      const newBuses = buses.map((bus) => {
-        const prev = prevPositions.current[bus.id];
-        const target = targetPositions.current[bus.id];
-
-        if (!prev || !target) return bus;
-
-        const lat = prev.lat + (target.lat - prev.lat) * 0.05; // 5% step
-        const lon = prev.lon + (target.lon - prev.lon) * 0.05;
-
-        prevPositions.current[bus.id] = { lat, lon };
-        return { ...bus, lat, lon };
-      });
-
-      setBuses(newBuses);
-    }, 1000); // every second
-
+    fetchBuses(); // initial fetch
+    const interval = setInterval(fetchBuses, 120000); // every 2 minutes
     return () => clearInterval(interval);
-  }, [buses]);
-
-  // Initial fetch and 2-min updates
-  useEffect(() => {
-    fetchBuses();
-    const fetchInterval = setInterval(fetchBuses, 120000); // 2 minutes
-    return () => clearInterval(fetchInterval);
   }, []);
 
   // Count bus statuses
@@ -61,21 +54,9 @@ export default function BusMap() {
   const ghostCount = buses.filter((b) => b.status === "Ghost").length;
   const anomalyCount = buses.filter((b) => b.status === "Anomaly").length;
 
-  // Apply filter
-  const filteredBuses =
-    filter === "All"
-      ? buses
-      : buses.filter((b) =>
-          filter === "Running"
-            ? b.status === "Running"
-            : filter === "Ghost"
-            ? b.status === "Ghost"
-            : b.status === "Anomaly"
-        );
-
   return (
     <div style={{ height: "100vh", width: "100%", position: "relative" }}>
-      {/* Filter dropdown */}
+      {/* Bus counts and chart button */}
       <div
         style={{
           position: "absolute",
@@ -89,35 +70,46 @@ export default function BusMap() {
           fontSize: "14px",
         }}
       >
-        <label>
-          Show:{" "}
-          <select value={filter} onChange={(e) => setFilter(e.target.value)}>
-            <option value="All">All</option>
-            <option value="Running">Running</option>
-            <option value="Ghost">Ghost</option>
-            <option value="Anomaly">Anomaly</option>
-          </select>
-        </label>
-      </div>
-
-      {/* Bus counts */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: 10,
-          left: 10,
-          background: "rgba(255,255,255,0.9)",
-          padding: "8px 12px",
-          borderRadius: "8px",
-          boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
-          zIndex: 1000,
-          fontSize: "14px",
-        }}
-      >
         🟢 Running: {runningCount} <br />
         🔴 Ghost: {ghostCount} <br />
-        🟠 Anomaly: {anomalyCount}
+        🟠 Anomaly: {anomalyCount} <br />
+        <button
+          style={{ marginTop: "5px", cursor: "pointer" }}
+          onClick={() => setShowChart(!showChart)}
+        >
+          {showChart ? "Hide Chart" : "Show Chart"}
+        </button>
       </div>
+
+      {/* Chart */}
+      {showChart && (
+        <div
+          style={{
+            position: "absolute",
+            top: 100,
+            left: 12,
+            width: 700,
+            height: 400,
+            background: "rgba(255,255,255,0.95)",
+            padding: "10px",
+            borderRadius: "8px",
+            boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
+            zIndex: 1000,
+          }}
+        >
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData}>
+              <XAxis dataKey="time" />
+              <YAxis />
+              <ChartTooltip />
+              <Legend />
+              <Line type="monotone" dataKey="Running" stroke="green" />
+              <Line type="monotone" dataKey="Ghost" stroke="red" />
+              <Line type="monotone" dataKey="Anomaly" stroke="orange" />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       {/* Map */}
       <MapContainer
@@ -131,9 +123,9 @@ export default function BusMap() {
           subdomains={["a", "b", "c", "d"]}
         />
 
-        {filteredBuses.map((bus, index) => (
+        {buses.map((bus, index) => (
           <CircleMarker
-            key={`${bus.feed}-${bus.id}-${index}`}
+            key={`${bus.feed}-${bus.id}-${index}`} // unique key
             center={[bus.lat, bus.lon]}
             radius={6}
             fillOpacity={1}
