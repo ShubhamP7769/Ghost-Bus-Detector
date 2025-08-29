@@ -1,154 +1,247 @@
-import React, { useEffect, useState } from "react";
-import { MapContainer, TileLayer, CircleMarker, Tooltip } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip as ChartTooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
+import L from 'leaflet';
+import React from 'react';
+import { MapContainer, TileLayer, Marker, Tooltip, useMap } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import axios from 'axios';
+
+// --- STYLING OBJECTS ---
+const styles = {
+  container: { position: 'relative', height: '100vh' },
+  map: { height: '100%', width: '100%' },
+  busInfoPanel: {
+    position: 'absolute', top: '10px', right: '10px', width: '250px',
+    background: 'rgba(255, 255, 255, 0.9)', padding: '10px',
+    borderRadius: '8px', zIndex: 1000,
+  },
+  statusOverlay: {
+    position: 'absolute', bottom: '20px', left: '10px', zIndex: 1000,
+    background: 'rgba(255, 255, 255, 0.9)', padding: '10px 15px',
+    borderRadius: '8px', fontWeight: 'bold',
+  },
+  loadingOverlay: {
+    position: 'absolute', top: '50%', left: '50%',
+    transform: 'translate(-50%, -50%)', zIndex: 1100,
+    background: 'rgba(255, 255, 255, 0.9)', padding: '20px', borderRadius: '8px',
+  },
+  closeButton: {
+    float: 'right', border: 'none', background: 'transparent',
+    cursor: 'pointer', fontSize: '16px',
+  },
+  filterPanel: {
+    position: 'absolute', top: '10px', left: '50%', transform: 'translateX(-50%)',
+    zIndex: 1000, background: 'rgba(255, 255, 255, 0.9)', padding: '8px',
+    borderRadius: '8px', display: 'flex', gap: '10px',
+  },
+  filterButton: {
+    padding: '8px 12px', border: 'none', borderRadius: '5px',
+    cursor: 'pointer', fontWeight: 'bold',
+  }
+};
+
+// --- COMPONENTS ---
+
+const BusMarkerIcon = ({ color }) => {
+  return L.divIcon({
+    className: 'custom-marker-icon',
+    html: `<div style="
+      background-color: ${color};
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 2px solid white;
+      box-shadow: 0 0 5px rgba(0,0,0,0.5);
+    "></div>`,
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
+  });
+};
+
+
+const BusInfoPanel = ({ bus, onClose }) => {
+  if (!bus) return null;
+  return (
+    <div style={styles.busInfoPanel}>
+      <button onClick={onClose} style={styles.closeButton}>✖</button>
+      <h3>Bus Details</h3>
+      <p><b>Bus ID:</b> {bus.id}</p>
+      <p><b>Route:</b> {bus.route}</p>
+      <p><b>Status:</b> {bus.status}</p>
+      <p><b>Speed:</b> {bus.speed ? bus.speed.toFixed(1) : 'N/A'} mph</p>
+    </div>
+  );
+};
+
+const MapPanController = ({ position }) => {
+    const map = useMap();
+    React.useEffect(() => {
+        if (position) {
+            map.flyTo(position, 15);
+        }
+    }, [position, map]);
+    return null;
+};
+
+// Filter controls component
+const FilterControls = ({ filters, onFilterChange }) => {
+    const getButtonStyle = (isActive) => ({
+        ...styles.filterButton,
+        backgroundColor: isActive ? '#337ab7' : '#f0f0f0',
+        color: isActive ? 'white' : 'black',
+    });
+
+    return (
+        <div style={styles.filterPanel}>
+            <button
+                style={getButtonStyle(filters.running)}
+                onClick={() => onFilterChange('running', !filters.running)}
+            >
+                Running
+            </button>
+            <button
+                style={getButtonStyle(filters.ghost)}
+                onClick={() => onFilterChange('ghost', !filters.ghost)}
+            >
+                Ghost
+            </button>
+            <button
+                style={getButtonStyle(filters.anomaly)}
+                onClick={() => onFilterChange('anomaly', !filters.anomaly)}
+            >
+                Anomaly
+            </button>
+        </div>
+    );
+};
 
 export default function BusMap() {
-  const [buses, setBuses] = useState([]);
-  const [showChart, setShowChart] = useState(false);
-  const [chartData, setChartData] = useState([]);
+  const [buses, setBuses] = React.useState([]);
+  const [positions, setPositions] = React.useState({});
+  const [counts, setCounts] = React.useState({ running_count: 0, ghost_count: 0, anomaly_count: 0 });
+  const [selectedBus, setSelectedBus] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState(null);
+  const [panToPosition, setPanToPosition] = React.useState(null);
+  const [filters, setFilters] = React.useState({ running: true, ghost: true, anomaly: true });
 
-  // Fetch bus data every 2 minutes
-  const fetchBuses = async () => {
-    try {
-      const response = await fetch("http://127.0.0.1:8000/buses");
-      const data = await response.json();
-      const busList = data.buses || [];
-      setBuses(busList);
+  React.useEffect(() => {
+    const fetchData = () => {
+      // REMOVED: Fetching from the /anomalies endpoint is no longer needed here.
+      axios.get('http://127.0.0.1:8000/buses')
+      .then(busRes => {
+        if (busRes.data && Array.isArray(busRes.data.buses)) {
+          const fetchedBuses = busRes.data.buses;
+          const anomalyCount = fetchedBuses.filter(b => b.has_anomaly).length;
+          setBuses(fetchedBuses);
+          setCounts({
+            running_count: busRes.data.running_count,
+            ghost_count: busRes.data.ghost_count,
+            anomaly_count: anomalyCount,
+          });
 
-      // Prepare chart data: counts by status over time
-      const runningCount = busList.filter((b) => b.status === "Running").length;
-      const ghostCount = busList.filter((b) => b.status === "Ghost").length;
-      const anomalyCount = busList.filter((b) => b.status === "Anomaly").length;
+          setPositions(prev => {
+            const updated = {...prev};
+            fetchedBuses.forEach(bus => {
+              if (!updated[bus.id]) {
+                updated[bus.id] = { currentLat: bus.lat, currentLon: bus.lon, targetLat: bus.lat, targetLon: bus.lon };
+              } else {
+                updated[bus.id].targetLat = bus.lat;
+                updated[bus.id].targetLon = bus.lon;
+              }
+            });
+            return updated;
+          });
+        }
+        setLoading(false);
+      }).catch(err => {
+        console.error('Error fetching data:', err);
+        setError('Failed to load bus data. Please try again later.');
+        setLoading(false);
+      });
+    };
 
-      setChartData((prev) => [
-        ...prev,
-        {
-          time: new Date().toLocaleTimeString(),
-          Running: runningCount,
-          Ghost: ghostCount,
-          Anomaly: anomalyCount,
-        },
-      ]);
-    } catch (err) {
-      console.error("Failed to fetch buses:", err);
-    }
-  };
-
-  useEffect(() => {
-    fetchBuses(); // initial fetch
-    const interval = setInterval(fetchBuses, 120000); // every 2 minutes
+    fetchData();
+    const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, []);
 
-  // Count bus statuses
-  const runningCount = buses.filter((b) => b.status === "Running").length;
-  const ghostCount = buses.filter((b) => b.status === "Ghost").length;
-  const anomalyCount = buses.filter((b) => b.status === "Anomaly").length;
+  React.useEffect(() => {
+    const animInterval = setInterval(() => {
+      setPositions(prev => {
+        const updated = {...prev};
+        Object.keys(updated).forEach(id => {
+          const pos = updated[id];
+          pos.currentLat += (pos.targetLat - pos.currentLat) * 0.1;
+          pos.currentLon += (pos.targetLon - pos.currentLon) * 0.1;
+        });
+        return updated;
+      });
+    }, 50);
+
+    return () => clearInterval(animInterval);
+  }, []);
+
+  const getBusMarkerColor = (bus) => {
+    if (bus.status === 'Ghost') return '#d9534f'; // Red
+    if (bus.has_anomaly) return '#f0ad4e';     // Orange
+    return '#5cb85c';                         // Green
+  };
+  
+  const filteredBuses = buses.filter(bus => {
+    const isRunning = bus.status === 'Running' && !bus.has_anomaly;
+    const isGhost = bus.status === 'Ghost';
+    const isAnomaly = bus.has_anomaly;
+
+    if (filters.running && isRunning) return true;
+    if (filters.ghost && isGhost) return true;
+    if (filters.anomaly && isAnomaly) return true;
+
+    return false;
+  });
+
+  if (loading) {
+    return <div style={styles.loadingOverlay}>Loading Live Bus Data...</div>;
+  }
+
+  if (error) {
+    return <div style={styles.loadingOverlay}>{error}</div>;
+  }
 
   return (
-    <div style={{ height: "100vh", width: "100%", position: "relative" }}>
-      {/* Bus counts and chart button */}
-      <div
-        style={{
-          position: "absolute",
-          top: 12,
-          left: 50,
-          background: "rgba(255,255,255,0.95)",
-          padding: "8px 12px",
-          borderRadius: "8px",
-          boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
-          zIndex: 1000,
-          fontSize: "14px",
-        }}
-      >
-        🟢 Running: {runningCount} <br />
-        🔴 Ghost: {ghostCount} <br />
-        🟠 Anomaly: {anomalyCount} <br />
-        <button
-          style={{ marginTop: "5px", cursor: "pointer" }}
-          onClick={() => setShowChart(!showChart)}
-        >
-          {showChart ? "Hide Chart" : "Show Chart"}
-        </button>
-      </div>
-
-      {/* Chart */}
-      {showChart && (
-        <div
-          style={{
-            position: "absolute",
-            top: 100,
-            left: 12,
-            width: 700,
-            height: 400,
-            background: "rgba(255,255,255,0.95)",
-            padding: "10px",
-            borderRadius: "8px",
-            boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
-            zIndex: 1000,
-          }}
-        >
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData}>
-              <XAxis dataKey="time" />
-              <YAxis />
-              <ChartTooltip />
-              <Legend />
-              <Line type="monotone" dataKey="Running" stroke="green" />
-              <Line type="monotone" dataKey="Ghost" stroke="red" />
-              <Line type="monotone" dataKey="Anomaly" stroke="orange" />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
-      {/* Map */}
-      <MapContainer
-        center={[40.7128, -74.006]}
-        zoom={12}
-        style={{ height: "100%", width: "100%" }}
-      >
+    <div style={styles.container}>
+      <MapContainer center={[40.7128, -74.006]} zoom={12} style={styles.map}>
+        <MapPanController position={panToPosition} />
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
-          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-          subdomains={["a", "b", "c", "d"]}
+          url="https://cartodb-basemaps-a.global.ssl.fastly.net/light_all/{z}/{x}/{y}{r}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> &copy; CARTO'
         />
 
-        {buses.map((bus, index) => (
-          <CircleMarker
-            key={`${bus.feed}-${bus.id}-${index}`} // unique key
-            center={[bus.lat, bus.lon]}
-            radius={6}
-            fillOpacity={1}
-            color={
-              bus.status === "Running"
-                ? "green"
-                : bus.status === "Ghost"
-                ? "red"
-                : "orange"
-            }
-          >
-            <Tooltip>
-              <div>
-                <strong>Bus ID:</strong> {bus.id} <br />
-                <strong>Feed:</strong> {bus.feed} <br />
-                <strong>Status:</strong> {bus.status} <br />
-                <strong>Speed:</strong>{" "}
-                {bus.speed ? bus.speed.toFixed(1) + " mph" : "N/A"}
-              </div>
-            </Tooltip>
-          </CircleMarker>
-        ))}
+        {filteredBuses
+          .filter(bus => positions[bus.id])
+          .map((bus) => {
+            const pos = positions[bus.id];
+            return (
+              <Marker
+                key={bus.id}
+                position={[pos.currentLat, pos.currentLon]}
+                icon={BusMarkerIcon({ color: getBusMarkerColor(bus) })}
+                eventHandlers={{ click: () => { setSelectedBus(bus); setPanToPosition([bus.lat, bus.lon]); } }}
+              >
+                <Tooltip>Bus ID: {bus.id}</Tooltip>
+              </Marker>
+            );
+        })}
       </MapContainer>
+
+      <FilterControls filters={filters} onFilterChange={(key, value) => setFilters(prev => ({...prev, [key]: value}))} />
+      {/* REMOVED: The AnomalyPanel is no longer rendered. */}
+      <BusInfoPanel bus={selectedBus} onClose={() => setSelectedBus(null)} />
+
+      <div style={styles.statusOverlay}>
+        <span style={{ marginRight: '15px' }}>🟢 Running: {counts.running_count}</span>
+        <span style={{ marginRight: '15px' }}>🔴 Ghost: {counts.ghost_count}</span>
+        <span>🟠 Anomaly: {counts.anomaly_count}</span>
+      </div>
     </div>
   );
 }
+
