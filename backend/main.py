@@ -1,90 +1,81 @@
+import time
+import math
+import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import requests
 from google.transit import gtfs_realtime_pb2
-import time
-from typing import Dict, Any
-import sys
 
 app = FastAPI()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# MTA API Configuration
-MTA_FEEDS = [
-    "https://gtfsrt.prod.obanyc.com/vehiclePositions?feed_id=b",   # Bronx
-    "https://gtfsrt.prod.obanyc.com/vehiclePositions?feed_id=bqc"  # Brooklyn, Queens, Staten Island
-]
+MTA_FEEDS = {
+    "Bronx": "https://gtfsrt.prod.obanyc.com/vehiclePositions?feed_id=b",
+    "BQC": "https://gtfsrt.prod.obanyc.com/vehiclePositions?feed_id=bqc"
+}
 
-# In-memory storage for bus data
-bus_data: Dict[str, Dict[str, Any]] = {}
+previous_positions = {}  # {bus_id: {"lat": .., "lon": .., "time": ..}}
 
-# Helper Function to Fetch and Parse Data
-def fetch_mta_data():
-    headers = {
-        'User-Agent': 'GhostBusDetector/1.0 (https://github.com/ShubhamP7769/Ghost-Bus-Detector)'
-    }
-    
-    current_time = time.time()
-    
-    for url in MTA_FEEDS:
-        try:
-            response = requests.get(url, headers=headers)
-            if response.status_code == 200:
-                feed = gtfs_realtime_pb2.FeedMessage()
-                feed.MergeFromString(response.content)
-                
-                for entity in feed.entity:
-                    if entity.HasField('vehicle'):
-                        bus_id = entity.vehicle.vehicle.id
-                        
-                        bus_data[bus_id] = {
-                            "id": bus_id,
-                            "route": entity.vehicle.trip.route_id,
-                            "lat": entity.vehicle.position.latitude,
-                            "lon": entity.vehicle.position.longitude,
-                            "speed": (entity.vehicle.position.speed * 2.23694) if entity.vehicle.position.HasField('speed') else 0,
-                            "timestamp": current_time,
-                            "status": "Running"
-                        }
-            else:
-                print(f"Error fetching data from {url}. Status code: {response.status_code}", file=sys.stderr)
-                print(f"Response: {response.text}", file=sys.stderr)
+def haversine(lat1, lon1, lat2, lon2):
+    R = 6371000
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lon2 - lon1)
+    a = math.sin(dphi/2)**2 + math.cos(phi1)*math.cos(phi2)*math.sin(dlambda/2)**2
+    return 2 * R * math.atan2(math.sqrt(a), math.sqrt(1-a))
 
-        except requests.exceptions.RequestException as e:
-            print(f"Request error fetching data from {url}: {e}", file=sys.stderr)
-        except Exception as e:
-            print(f"Failed to parse data from {url}. Error: {e}", file=sys.stderr)
-            print(f"Response content preview: {response.content[:500]}", file=sys.stderr)
-
-# API Endpoint
 @app.get("/buses")
-def get_buses():
-    fetch_mta_data()
-    
-    current_time = time.time()
-    processed_buses = []
-    
-    running_count = 0
-    ghost_count = 0
-    
-    for bus_id, data in list(bus_data.items()):
-        # A bus is a "ghost" if its data hasn't been updated in over 1 minute (60s)
-        if current_time - data["timestamp"] > 60:
-            data["status"] = "Ghost"
-            ghost_count += 1
-        else:
-            data["status"] = "Running"
-            running_count += 1
-        
-        processed_buses.append(data)
+async def get_buses():
+    buses_data = []
+    now = time.time()
+    for feed_name, url in MTA_FEEDS.items():
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                response = await client.get(url)
+                feed = gtfs_realtime_pb2.FeedMessage()
+                feed.ParseFromString(response.content)
 
-    return {
-        "buses": processed_buses,
-        "running_count": running_count,
-        "ghost_count": ghost_count
-    }
+                for entity in feed.entity:
+                    if not entity.HasField("vehicle"):
+                        continue
+                    bus_id = entity.vehicle.vehicle.id
+                    lat = entity.vehicle.position.latitude
+                    lon = entity.vehicle.position.longitude
+
+                    prev = previous_positions.get(bus_id)
+                    speed = None
+                    if prev:
+                        dist = haversine(prev["lat"], prev["lon"], lat, lon)
+                        dt = now - prev["time"]
+                        if dt > 0:
+                            speed = (dist / dt) * 2.23694  # m/s → mph
+
+                    # Ghost if not moved for 2 minutes
+                    if prev and now - prev["time"] > 120 and prev["lat"] == lat and prev["lon"] == lon:
+                        status = "Ghost"
+                    elif speed and speed > 80:
+                        status = "Anomaly"
+                    else:
+                        status = "Running"
+
+                    previous_positions[bus_id] = {"lat": lat, "lon": lon, "time": now}
+
+                    buses_data.append({
+                        "id": bus_id,
+                        "lat": lat,
+                        "lon": lon,
+                        "status": status,
+                        "feed": feed_name,
+                        "speed": speed
+                    })
+        except Exception as e:
+            print(f"Error fetching {feed_name}: {e}")
+            continue
+
+    return {"buses": buses_data}
