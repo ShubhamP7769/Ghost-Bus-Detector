@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.log
+*.sqlite3
+*.db
+.venv/
+venv/
+env/
+.mypy_cache/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Node.js / React
+node_modules/
+dist/
+build/
+out/
+.npm/
+.cache/
+.next/
+.nuxt/
+.parcel-cache/
+.vite/
+
+# Java / others
+target/
+
+# OS junk
+.DS_Store
+Thumbs.db
