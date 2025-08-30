@@ -44,3 +44,4 @@ Thumbs.db
 .env.development
 .env.production
 .env.test
+cleanup.py
