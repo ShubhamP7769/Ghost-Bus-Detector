@@ -1,5 +1,4 @@
-// MapComponent.js
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { MapContainer, TileLayer, CircleMarker, Tooltip } from "react-leaflet";
 import BusTrendChart from "./BusTrendChart";
 import "leaflet/dist/leaflet.css";
@@ -10,36 +9,15 @@ const STATUS_COLOR = {
   anomaly: "orange",
 };
 
-export default function MapComponent() {
-  const [buses, setBuses] = useState([]);
+export default function MapComponent({ buses }) {
   const [showChart, setShowChart] = useState(false);
   const [filterStatus, setFilterStatus] = useState("all");
   const [selectedBus, setSelectedBus] = useState(null);
 
-  const fetchBuses = async () => {
-    try {
-      const res = await fetch("http://127.0.0.1:8000/buses");
-      const data = await res.json();
-      const parsedData = data.map(bus => ({
-        ...bus,
-        timestamp: Number(bus.timestamp),
-      }));
-      setBuses(parsedData);
-    } catch (error) {
-      console.error("Error fetching buses:", error);
-    }
-  };
-
-  useEffect(() => {
-    fetchBuses();
-    const interval = setInterval(fetchBuses, 5000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Optimized filtering with useMemo
+  // useMemo to get latest bus states
   const latestBuses = useMemo(() => {
     const latestBusesMap = new Map();
-    buses.forEach(bus => {
+    buses.forEach((bus) => {
       const existing = latestBusesMap.get(bus.id);
       if (!existing || bus.timestamp > existing.timestamp) {
         latestBusesMap.set(bus.id, bus);
@@ -48,14 +26,14 @@ export default function MapComponent() {
     return Array.from(latestBusesMap.values());
   }, [buses]);
 
+  // Improved filtering with useMemo that respects case
   const filteredBuses = useMemo(() => {
-    return latestBuses.filter(bus =>
-      filterStatus === "all" ? true : bus.status === filterStatus
-    );
+    if (filterStatus === "all") return latestBuses;
+    return latestBuses.filter((bus) => bus.status.toLowerCase() === filterStatus.toLowerCase());
   }, [latestBuses, filterStatus]);
 
   const countStatus = (status) =>
-    latestBuses.filter((b) => b.status === status).length;
+    latestBuses.filter((b) => b.status.toLowerCase() === status.toLowerCase()).length;
 
   return (
     <div style={{ position: "relative", width: "100vw", height: "100vh", overflow: "hidden" }}>
@@ -73,27 +51,29 @@ export default function MapComponent() {
           color: "white",
           fontWeight: "bold",
           cursor: "pointer",
-          boxShadow: "0 2px 6px rgba(0,0,0,0.2)"
+          boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
         }}
         onClick={() => setShowChart(!showChart)}
       >
         {showChart ? "Hide Chart" : "Show Chart"}
       </button>
 
-      {/* Cleaner Filter Buttons */}
-      <div style={{
-        position: "absolute",
-        top: 10,
-        right: 30,
-        zIndex: 1000,
-        background: "rgba(255, 255, 255, 0.9)",
-        padding: "6px 10px",
-        borderRadius: "10px",
-        boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-        display: "flex",
-        gap: "8px",
-      }}>
-        {["all", "normal", "ghost", "anomaly"].map(status => (
+      {/* Filter Buttons */}
+      <div
+        style={{
+          position: "absolute",
+          top: 10,
+          right: 30,
+          zIndex: 1000,
+          background: "rgba(255, 255, 255, 0.9)",
+          padding: "6px 10px",
+          borderRadius: "10px",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+          display: "flex",
+          gap: "8px",
+        }}
+      >
+        {["all", "normal", "ghost", "anomaly"].map((status) => (
           <button
             key={status}
             onClick={() => setFilterStatus(status)}
@@ -105,7 +85,7 @@ export default function MapComponent() {
               fontWeight: "bold",
               background: filterStatus === status ? "#007bff" : "#f0f0f0",
               color: filterStatus === status ? "white" : "black",
-              transition: "0.3s"
+              transition: "0.3s",
             }}
           >
             {status.charAt(0).toUpperCase() + status.slice(1)}
@@ -113,7 +93,7 @@ export default function MapComponent() {
         ))}
       </div>
 
-      {/* Floating Info Panel (Modern Look) */}
+      {/* Selected Bus Info Panel */}
       {selectedBus && (
         <div
           style={{
@@ -129,12 +109,14 @@ export default function MapComponent() {
             boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
           }}
         >
-          <div style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "8px"
-          }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "8px",
+            }}
+          >
             <h4 style={{ margin: 0 }}>Bus Info</h4>
             <span
               style={{ cursor: "pointer", fontWeight: "bold" }}
@@ -143,14 +125,22 @@ export default function MapComponent() {
               ×
             </span>
           </div>
-          <p><b>ID:</b> {selectedBus.id}</p>
-          <p><b>Status:</b> {selectedBus.status}</p>
-          <p><b>Lat:</b> {selectedBus.lat.toFixed(5)}</p>
-          <p><b>Lon:</b> {selectedBus.lon.toFixed(5)}</p>
+          <p>
+            <b>ID:</b> {selectedBus.id}
+          </p>
+          <p>
+            <b>Status:</b> {selectedBus.status}
+          </p>
+          <p>
+            <b>Lat:</b> {selectedBus.lat.toFixed(5)}
+          </p>
+          <p>
+            <b>Lon:</b> {selectedBus.lon.toFixed(5)}
+          </p>
         </div>
       )}
 
-      {/* Floating Chart Panel */}
+      {/* Chart Panel */}
       {showChart && (
         <div
           style={{
@@ -206,7 +196,7 @@ export default function MapComponent() {
         })}
       </MapContainer>
 
-      {/* Live Stats Bar */}
+      {/* Status Bar */}
       <div
         style={{
           position: "absolute",
@@ -218,36 +208,42 @@ export default function MapComponent() {
           zIndex: 1000,
         }}
       >
-        <span style={{
-          background: "green",
-          color: "white",
-          padding: "6px 14px",
-          borderRadius: "20px",
-          fontWeight: "bold"
-        }}>
+        <span
+          style={{
+            background: "green",
+            color: "white",
+            padding: "6px 14px",
+            borderRadius: "20px",
+            fontWeight: "bold",
+          }}
+        >
           Normal: {countStatus("normal")}
         </span>
-        <span style={{
-          background: "red",
-          color: "white",
-          padding: "6px 14px",
-          borderRadius: "20px",
-          fontWeight: "bold"
-        }}>
+        <span
+          style={{
+            background: "red",
+            color: "white",
+            padding: "6px 14px",
+            borderRadius: "20px",
+            fontWeight: "bold",
+          }}
+        >
           Ghost: {countStatus("ghost")}
         </span>
-        <span style={{
-          background: "orange",
-          color: "white",
-          padding: "6px 14px",
-          borderRadius: "20px",
-          fontWeight: "bold"
-        }}>
+        <span
+          style={{
+            background: "orange",
+            color: "white",
+            padding: "6px 14px",
+            borderRadius: "20px",
+            fontWeight: "bold",
+          }}
+        >
           Anomaly: {countStatus("anomaly")}
         </span>
       </div>
 
-      {/* Custom styles */}
+      {/* Custom Styles */}
       <style>
         {`
           html, body {
