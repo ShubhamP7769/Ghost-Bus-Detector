@@ -26,6 +26,19 @@ env/
 .venv/
 ENV/
 
+# Logs
+*.log
+
+# Redis
+dump.rdb
+*.rdb
+
+# Test / Coverage
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
 # =========================
 # Common / OS / IDE
 # =========================
@@ -44,4 +57,8 @@ Thumbs.db
 .env.development
 .env.production
 .env.test
+
+# =========================
+# Custom
+# =========================
 cleanup.py
