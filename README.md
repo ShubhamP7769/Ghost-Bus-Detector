@@ -1,3 +1,8 @@
+Perfect 👍 I’ll clean it up further and remove the **Screenshots** and **Future Improvements** sections.
+Here’s your final **simple, professional README**:
+
+---
+
 # 🚌 Ghost Bus Detector
 
 A real-time bus tracking and anomaly detection system that helps identify **ghost buses** (buses that appear on schedules but don’t actually arrive) and other irregularities. This project uses **FastAPI, Redis, React, and WebSockets** to fetch, process, and visualize bus data on an interactive map.
@@ -122,15 +127,6 @@ The frontend will now run on:
 2. Data is processed and anomalies (ghost buses, missing buses, delays) are detected.
 3. The data is stored in **Redis** and served to the frontend via **WebSockets**.
 4. The React app displays buses on a **map**, along with alerts and trend charts.
-   
-
----
-
-
-## 🤝 Contributing
-
-Contributions, issues, and feature requests are welcome!
-Feel free to fork this repo and submit a pull request.
 
 ---
 
@@ -140,4 +136,6 @@ This project is licensed under the **MIT License**.
 
 ---
 
+✅ Now your README is short, clean, and professional.
 
+Do you want me to also **add a “Demo” section with instructions for deployment (Heroku/Render + Vercel/Netlify)** so others can easily try it out online?
