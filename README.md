@@ -1,83 +1,156 @@
-Ghost Bus Detector
+# 🚌 Ghost Bus Detector
 
-About the Project
+A real-time bus tracking and anomaly detection system that helps identify **ghost buses** (buses that appear on schedules but don’t actually arrive) and other irregularities. This project uses **FastAPI, Redis, React, and WebSockets** to fetch, process, and visualize bus data on an interactive map.
 
-Ghost Bus Detector is a real-time bus tracking application designed to monitor MTA bus feeds and identify "ghost buses"—buses that appear on live transit maps but are no longer actively running. By analyzing live data, this tool helps detect inconsistencies and anomalies in bus tracking information, providing a clearer, more accurate visualization of bus locations for transit users or system operators.
+This is my **first project**, built to learn how backend, frontend, and live data pipelines work together in real-world applications.
 
-This project combines a Python-based backend API that fetches and processes data from MTA GTFS-RT feeds with a React frontend that displays bus locations on an interactive map. It also uses Redis for data caching to improve the performance and responsiveness of the system.
+---
 
-As the first project, it represents an integration of real-time data processing, web development, and anomaly detection to solve a practical transportation problem.
+## ✨ Features
 
-Features:
+* 🔴 Detect **ghost buses** in real-time
+* 📡 Live bus tracking on an interactive **Leaflet map**
+* 📊 **Bus trend chart** to visualize activity patterns
+* ⚠️ **Alerts & notifications** when anomalies occur
+* 🔍 Filters to view specific buses and statuses
+* 📌 Click on a bus to see detailed information
 
-*Real-time Bus Tracking: Continuously displays current locations of buses on an interactive map.
-*Ghost Bus Detection: Flags buses that haven't updated their positions within a specified time, labeling them as ghost buses.
-*Anomaly Detection: Identifies buses with unexpectedly fresh or irregular data updates.
-*Interactive Frontend: Built with React and Leaflet for smooth mapping and user-friendly display.
-*Efficient Backend: A FastAPI-based Python backend that handles data fetching, processing, and serving the API.
-*Data Caching: Uses Redis to cache bus data and reduce latency.
+---
 
-Tech Stack:
+## 🛠️ Tech Stack
 
-Frontend: React, Leaflet.js
-Backend: Python, FastAPI
-Data Caching: Redis
-Real-time Data Source: MTA GTFS-RT feeds
-Additional Tools: Node.js, npm
+**Frontend:**
 
-Getting Started:
+* React.js
+* Leaflet (Map visualization)
+* WebSockets (real-time updates)
 
-Prerequisites:
+**Backend:**
 
-Before running the project, ensure you have the following installed on your system:
-Node.js and npm (for frontend development)
-Python 3 (for backend API)
-Redis (for caching bus data)
+* FastAPI (Python)
+* Redis (Data caching)
+* GTFS-Realtime (Bus feed integration)
 
-Installation and Setup:
+**Other Tools:**
 
-Clone the repository:
-bash
-git clone https://github.com/shubhamp7769/ghost-bus-detector.git
-cd ghost-bus-detector
+* NPM / Node.js
+* Git & GitHub
 
-Setup Backend:
+---
 
-Navigate to the backend directory:
-bash
-cd backend
-Install Python dependencies:
-bash
-pip install -r requirements.txt
-Ensure Redis is running on your machine (default settings assumed).
+## 📂 Project Structure
 
-Start the backend server:
-bash
-uvicorn main:app --reload
-The backend API will be hosted at http://localhost:8000 by default.
+```
+Ghost-Bus-Detector/
+│── backend/        # FastAPI server & Redis integration
+│── frontend/       # React frontend with map and charts
+│── README.md       # Project documentation
+```
 
-Setup Frontend:
+---
 
-Open a new terminal window/tab and navigate to the frontend directory:
-bash
-cd frontend
-Install Node.js dependencies:
-bash
-npm install
+## ⚡ Getting Started
 
-Start the React development server:
-bash
-npm start
-The frontend will open in your default browser, typically at http://localhost:3000, showing the interactive bus map with real-time tracking and ghost bus detection.
+Follow these steps to set up and run the project locally.
 
-Usage:
+### 1️⃣ Clone the repository
 
-*Use the frontend map to view active buses and their locations.
-*Ghost buses—those not updating their location timely—will be flagged clearly.
-*The backend API is responsible for fetching and processing raw MTA data.
+```bash
+git clone https://github.com/ShubhamP7769/Ghost-Bus-Detector.git
+cd Ghost-Bus-Detector
+```
 
-Contributing:
-As this is the first version of the project, contributions, issues, and suggestions are welcome to improve or extend its functionality.
+### 2️⃣ Backend Setup (FastAPI + Redis)
 
-License:
-This project is licensed under the MIT License. See the LICENSE file for more details.
+1. Navigate to backend folder:
+
+   ```bash
+   cd backend
+   ```
+
+2. (Optional) Create a virtual environment:
+
+   ```bash
+   python -m venv venv
+   source venv/bin/activate    # On Mac/Linux
+   venv\Scripts\activate       # On Windows
+   ```
+
+3. Install dependencies:
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. Start the FastAPI server:
+
+   ```bash
+   uvicorn main:app --reload
+   ```
+
+The backend will now run on:
+👉 `http://127.0.0.1:8000`
+
+### 3️⃣ Frontend Setup (React)
+
+1. Open a new terminal and go to the frontend folder:
+
+   ```bash
+   cd frontend
+   ```
+
+2. Install dependencies:
+
+   ```bash
+   npm install
+   ```
+
+3. Start the React app:
+
+   ```bash
+   npm start
+   ```
+
+The frontend will now run on:
+👉 `http://localhost:3000`
+
+---
+
+## 🚀 How It Works
+
+1. The backend fetches bus data using **GTFS-Realtime API**.
+2. Data is processed and anomalies (ghost buses, missing buses, delays) are detected.
+3. The data is stored in **Redis** and served to the frontend via **WebSockets**.
+4. The React app displays buses on a **map**, along with alerts and trend charts.
+
+---
+
+## 📸 Screenshots (Optional)
+
+*(You can add screenshots or GIFs of your app running here)*
+
+---
+
+## 🏗️ Future Improvements
+
+* Add historical analysis of ghost buses
+* Improve UI with dark mode
+* Deploy on cloud (Heroku / Vercel + Render)
+* SMS/Email alerts for bus delays
+
+---
+
+## 🤝 Contributing
+
+Contributions, issues, and feature requests are welcome!
+Feel free to fork this repo and submit a pull request.
+
+---
+
+## 📜 License
+
+This project is licensed under the **MIT License**.
+
+---
+
+👉 Would you like me to also **add a demo usage GIF/screenshot section** (with placeholders) so it looks more professional on GitHub?
