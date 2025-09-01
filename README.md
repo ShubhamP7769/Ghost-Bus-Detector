@@ -122,23 +122,10 @@ The frontend will now run on:
 2. Data is processed and anomalies (ghost buses, missing buses, delays) are detected.
 3. The data is stored in **Redis** and served to the frontend via **WebSockets**.
 4. The React app displays buses on a **map**, along with alerts and trend charts.
+   
 
 ---
 
-## 📸 Screenshots (Optional)
-
-*(You can add screenshots or GIFs of your app running here)*
-
----
-
-## 🏗️ Future Improvements
-
-* Add historical analysis of ghost buses
-* Improve UI with dark mode
-* Deploy on cloud (Heroku / Vercel + Render)
-* SMS/Email alerts for bus delays
-
----
 
 ## 🤝 Contributing
 
@@ -153,4 +140,4 @@ This project is licensed under the **MIT License**.
 
 ---
 
-👉 Would you like me to also **add a demo usage GIF/screenshot section** (with placeholders) so it looks more professional on GitHub?
+
