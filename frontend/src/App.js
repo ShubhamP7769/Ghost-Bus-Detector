@@ -14,7 +14,6 @@ function App() {
         const data = JSON.parse(event.data);
         setBuses(data);
 
-        // Determine alert based on ghost and anomaly count
         const ghostCount = data.filter((bus) => bus.status === "ghost").length;
         const anomalyCount = data.filter((bus) => bus.status === "anomaly").length;
 
@@ -39,7 +38,6 @@ function App() {
     };
   }, []);
 
-  // Alert dismiss handler
   const handleAlertClose = () => {
     setAlertMessage(null);
   };

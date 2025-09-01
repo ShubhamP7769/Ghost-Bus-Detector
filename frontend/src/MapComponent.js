@@ -14,7 +14,6 @@ export default function MapComponent({ buses }) {
   const [filterStatus, setFilterStatus] = useState("all");
   const [selectedBus, setSelectedBus] = useState(null);
 
-  // useMemo to get latest bus states
   const latestBuses = useMemo(() => {
     const latestBusesMap = new Map();
     buses.forEach((bus) => {
@@ -26,10 +25,12 @@ export default function MapComponent({ buses }) {
     return Array.from(latestBusesMap.values());
   }, [buses]);
 
-  // Improved filtering with useMemo that respects case
   const filteredBuses = useMemo(() => {
     if (filterStatus === "all") return latestBuses;
-    return latestBuses.filter((bus) => bus.status.toLowerCase() === filterStatus.toLowerCase());
+    return latestBuses.filter((bus) => {
+      if (!bus.status) return false;
+      return bus.status.trim().toLowerCase() === filterStatus.toLowerCase();
+    });
   }, [latestBuses, filterStatus]);
 
   const countStatus = (status) =>
@@ -98,7 +99,7 @@ export default function MapComponent({ buses }) {
         <div
           style={{
             position: "absolute",
-            top: 60,
+            top: 105,
             right: 30,
             zIndex: 1000,
             width: 260,
@@ -182,7 +183,7 @@ export default function MapComponent({ buses }) {
               key={bus.id + "_" + bus.timestamp}
               center={[bus.lat, bus.lon]}
               radius={isSelected ? 10 : 6}
-              color={STATUS_COLOR[bus.status]}
+              color={STATUS_COLOR[bus.status.trim().toLowerCase()]}
               fillOpacity={0.9}
               weight={isSelected ? 3 : 1}
               eventHandlers={{
