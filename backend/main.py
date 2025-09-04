@@ -8,8 +8,8 @@ from google.transit import gtfs_realtime_pb2
 import asyncio
 import socket
 import requests.packages.urllib3.util.connection as urllib3_cn
+from fastapi.responses import PlainTextResponse
 
-# Force requests to always use IPv4 (fix DNS resolution issue on Windows)
 def allowed_gai_family():
     return socket.AF_INET
 urllib3_cn.allowed_gai_family = allowed_gai_family
@@ -24,7 +24,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Redis connection
 r = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
 
 MTA_URLS = [
@@ -33,9 +32,9 @@ MTA_URLS = [
 ]
 
 CACHE_KEY = "buses"
-CACHE_EXPIRY = 5  # fetch fresh data every 5 seconds
-STATE_KEY = "bus_states"  # for tracking ghost/anomaly history
-RECOVERY_TIME = 120         # 2 minutes recovery
+CACHE_EXPIRY = 5  
+STATE_KEY = "bus_states"  
+RECOVERY_TIME = 120         
 
 
 @app.get("/buses")
@@ -45,7 +44,6 @@ def get_buses():
         return json.loads(cached)
     buses = []
     now = int(time.time())
-    # Load previous states (persist anomaly/ghost timing)
     try:
         states = json.loads(r.get(STATE_KEY) or "{}")
     except:
@@ -65,19 +63,15 @@ def get_buses():
                     timestamp = vehicle.timestamp or now
                     age_seconds = now - timestamp
                     prev_state = states.get(vehicle_id, {})
-                    # Default to normal
                     status = "normal"
-                    # Ghost detection faster now: 60s old → ghost
                     if age_seconds > 60:
                         status = "ghost"
-                    elif age_seconds < 2:   # very fresh update → anomaly
+                    elif age_seconds < 2:   
                         status = "anomaly"
-                    # Recovery logic: if bus has been ghost/anomaly > 2 minutes, return to normal
                     if prev_state.get("status") in ["ghost", "anomaly"]:
                         entered_at = prev_state.get("since", now)
                         if now - entered_at >= RECOVERY_TIME:
                             status = "normal"
-                    # Save/update state
                     if status != prev_state.get("status"):
                         states[vehicle_id] = {"status": status, "since": now}
                     buses.append({
@@ -90,12 +84,10 @@ def get_buses():
         except Exception as e:
             print(f"Error fetching {url}:", e)
             continue
-    # Save states persistently in Redis
     r.set(STATE_KEY, json.dumps(states))
     r.set(CACHE_KEY, json.dumps(buses), ex=CACHE_EXPIRY)
     return buses
 
-# WebSocket manager to handle multiple connections
 class ConnectionManager:
     def __init__(self):
         self.active_connections: list[WebSocket] = []
@@ -116,7 +108,6 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-# Background task to fetch bus data every CACHE_EXPIRY seconds and broadcast to clients
 async def bus_data_broadcaster():
     while True:
         try:
@@ -136,7 +127,21 @@ async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     try:
         while True:
-            # Keep connection alive by receiving messages (if any)
+            
             await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(websocket)
+
+@app.get("/")
+def root():
+    return {
+        "message": "Ghost Bus Detector API is running",
+        "endpoints": {
+            "REST": "/buses",
+            "WebSocket": "/ws/buses"
+        }
+    }
+
+@app.get("/favicon.ico")
+def favicon():
+    return PlainTextResponse("", status_code=204)
